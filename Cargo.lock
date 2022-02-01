@@ -154,9 +154,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.115"
+version = "0.2.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a8d982fa7a96a000f6ec4cfe966de9703eccde29750df2bb8949da91b0e818d"
+checksum = "565dbd88872dbe4cc8a46e527f26483c1d1f7afa6b884a3bd6cd893d4f98da74"
 
 [[package]]
 name = "lock_api"
@@ -486,9 +486,10 @@ dependencies = [
 [[package]]
 name = "todo-core"
 version = "1.0.0"
-source = "git+https://github.com/frankiebaffa/todo_core?branch=master#5b071bf28c648c6b1a4fb1e586e11bdaea4b7e2d"
+source = "git+https://github.com/frankiebaffa/todo_core?branch=impl_crossterm#d978aa7a0280cc12fa017f5e2d79f5949c483464"
 dependencies = [
  "chrono",
+ "crossterm",
  "serde",
  "serde_json",
  "termion",

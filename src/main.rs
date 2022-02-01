@@ -4,9 +4,13 @@ use {
         Subcommand,
     },
     crossterm::{
+        Command,
         QueueableCommand,
+        terminal::{
+            Clear,
+            ClearType,
+        },
         cursor,
-        style,
     },
     std::{
         fmt::{
@@ -19,6 +23,7 @@ use {
             Error as IOError,
             Read,
             stdout,
+            Stdout,
             Write,
         },
         path::PathBuf,
@@ -38,6 +43,7 @@ use {
         ItemActor,
         ItemType,
         PrintWhich,
+        Terminal,
     },
 };
 #[derive(Parser, Clone)]
@@ -189,6 +195,7 @@ pub struct Ctx {
     pub args: Args,
     pub buffer: String,
     pub path: PathBuf,
+    pub term: Stdout,
 }
 impl<'ctx> Ctx {
     fn construct_path(&mut self) {
@@ -204,12 +211,12 @@ impl<'ctx> Ctx {
             None => self.path.push(format!("{}.json", &self.args.list_path)),
         }
     }
-    pub fn init() -> Result<Self, ExitCode> {
+    pub fn init(out: Stdout) -> Result<Self, ExitCode> {
         let mut args = Args::parse();
         args.reverse_coordinates();
         let buffer = String::new();
         let path = PathBuf::new();
-        let mut ctx = Self { args, buffer, path, };
+        let mut ctx = Self { args, buffer, path, term: out };
         ctx.construct_path();
         Ok(ctx)
     }
@@ -256,6 +263,15 @@ impl GetPath for Ctx {
     }
     fn get_path_mut(&mut self) -> &mut PathBuf {
         return &mut self.path;
+    }
+}
+impl Terminal for Ctx {
+    fn queue_cmd(&mut self, cmd: impl Command) -> Result<(), IOError> {
+        self.term.queue(cmd)?;
+        Ok(())
+    }
+    fn write_str(&mut self, msg: impl AsRef<str>) -> Result<(), IOError> {
+        self.term.write_all(msg.as_ref().as_bytes())
     }
 }
 fn safe_get_list(arg: &str) -> Result<String, String> {
@@ -306,8 +322,8 @@ fn sleep_til(start: Instant) {
     }
 }
 fn main() -> Result<(), IOError> {
-    let mut out = stdout();
-    let mut ctx = Ctx::init().unwrap_or_else(|e| {
+    let out = stdout();
+    let mut ctx = Ctx::init(out).unwrap_or_else(|e| {
         println!("{}", e);
         std::process::exit(e.into());
     });
@@ -316,14 +332,10 @@ fn main() -> Result<(), IOError> {
         Mode::Monitor => {
             ctx.check_path(PathExitCondition::NotExists)
                 .unwrap_or_else(|e| safe_exit(&mut ctx, e));
-            //let mut term = out.into_raw_mode().unwrap_or_else(|e| {
-            //    println!("{}", e);
-            //    std::process::exit(0);
-            //});
+            ctx.queue_cmd(cursor::SavePosition)?;
             let mut hash = String::new();
             loop {
                 let start = Instant::now();
-                let mut content = String::new();
                 {
                     let mut container = Container::load(&mut ctx)
                         .unwrap_or_else(|e| safe_exit(&mut ctx, e));
@@ -349,13 +361,14 @@ fn main() -> Result<(), IOError> {
                         sleep_til(start);
                         continue;
                     }
+                    ctx.queue_cmd(cursor::RestorePosition)?;
+                    ctx.queue_cmd(Clear(ClearType::FromCursorDown))?;
                     container.print(
-                        &mut content, &PrintWhich::All, false, None, false
-                    );
+                        &mut ctx, &PrintWhich::All, false, None, false
+                    )?;
+                    ctx.write_str("\n")?;
                 }
                 // clear
-                println!("{}[2J", 27 as char);
-                println!("{}", content);
                 sleep_til(start);
             }
         },
@@ -475,21 +488,20 @@ fn main() -> Result<(), IOError> {
                 .unwrap_or_else(|e| safe_exit(&mut ctx, e));
             let mut container = Container::load(&mut ctx)
                 .unwrap_or_else(|e| safe_exit(&mut ctx, e));
-            let mut content = String::new();
             container.print(
-                &mut content, &print_which, args.plain, args.level,
+                &mut ctx, &print_which, args.plain, args.level,
                 args.display_hidden,
-            );
-            ctx.print(content);
-            if args.status {
-                ctx.check_path(PathExitCondition::NotExists)
-                    .unwrap_or_else(|e| safe_exit(&mut ctx, e));
-                let mut content = String::new();
-                let mut container = Container::load(&mut ctx)
-                    .unwrap_or_else(|e| safe_exit(&mut ctx, e));
-                container.status(&mut content, &print_which);
-                ctx.print(content);
-            }
+            )?;
+            ctx.write_str("\n")?;
+            //if args.status {
+            //    ctx.check_path(PathExitCondition::NotExists)
+            //        .unwrap_or_else(|e| safe_exit(&mut ctx, e));
+            //    let mut content = String::new();
+            //    let mut container = Container::load(&mut ctx)
+            //        .unwrap_or_else(|e| safe_exit(&mut ctx, e));
+            //    container.status(&mut content, &print_which);
+            //    ctx.print(content);
+            //}
         },
     }
     safe_exit(&mut ctx, ExitCode::Success);
