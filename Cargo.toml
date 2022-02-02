@@ -9,5 +9,5 @@ edition = "2021"
 clap = { version = "3", features = ["derive"] }
 crossterm = "0.22"
 md5 = "0.7"
-todo-core = { git = "https://github.com/frankiebaffa/todo_core", branch = "impl_crossterm" }
+todo-core = { git = "https://github.com/frankiebaffa/todo_core", branch = "master" }
 termion = "*"
