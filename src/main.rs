@@ -1,120 +1,92 @@
 use {
-    clap::{
-        Parser,
-        Subcommand,
-    },
+    clap::{ Parser, Subcommand, },
     crossterm::{
-        Command,
         QueueableCommand,
-        terminal::{
-            Clear,
-            ClearType,
-        },
-        cursor,
+        terminal::{ Clear, ClearType, },
+        style::{ Stylize, Attribute, },
     },
     std::{
-        fmt::{
-            Display,
-            Formatter,
-            Error as FormatError,
-        },
+        fmt::{ Display, Formatter, Error as FormatError, },
         fs::File,
-        io::{
-            Error as IOError,
-            Read,
-            stdout,
-            Stdout,
-            Write,
-        },
+        io::{ Error as IOError, Read, stdout },
         path::PathBuf,
         thread::sleep as thread_sleep,
-        time::{
-            Duration,
-            Instant,
-        },
+        time::{ Duration, Instant, },
     },
     todo_core::{
-        Container,
-        ItemStatus,
-        GetPath,
-        ExitCode,
-        PathExitCondition,
-        ItemAction,
-        ItemActor,
-        ItemType,
-        PrintWhich,
-        Terminal,
+        Container, ItemStatus, GetPath, ExitCode, PathExitCondition, ItemAction,
+        ItemActor, ItemType, PrintWhich,
     },
 };
 #[derive(Parser, Clone)]
-pub struct AddArgs {
+struct AddArgs {
     #[clap()]
-    pub item_nest_location: Vec<usize>,
+    item_nest_location: Vec<usize>,
     #[clap(short='m', long)]
-    pub item_message: String,
+    item_message: String,
     #[clap(short='t', long, default_value_t = ItemType::Todo)]
-    pub item_type: ItemType,
+    item_type: ItemType,
 }
 #[derive(Parser, Clone)]
-pub struct CheckArgs {
+struct CheckArgs {
     #[clap()]
-    pub item_location: Vec<usize>,
+    item_location: Vec<usize>,
 }
 #[derive(Parser, Clone)]
-pub struct DisableArgs {
+struct DisableArgs {
     #[clap()]
-    pub item_location: Vec<usize>,
+    item_location: Vec<usize>,
 }
 #[derive(Parser, Clone)]
-pub struct EditArgs {
+struct EditArgs {
     #[clap()]
-    pub item_location: Vec<usize>,
+    item_location: Vec<usize>,
     #[clap(short='m', long)]
-    pub item_message: String,
+    item_message: String,
 }
 #[derive(Parser, Clone)]
-pub struct HideArgs {
+struct HideArgs {
     #[clap()]
-    pub item_location: Vec<usize>,
+    item_location: Vec<usize>,
 }
 #[derive(Parser, Clone)]
-pub struct MoveArgs {
+struct MoveArgs {
     #[clap()]
-    pub item_location: Vec<usize>,
+    item_location: Vec<usize>,
     #[clap(short='o', long)]
-    pub output_location: Vec<usize>,
+    output_location: Vec<usize>,
 }
 #[derive(Parser, Clone)]
-pub struct ShowArgs {
+struct ShowArgs {
     #[clap(short='p', long, default_value_t = PrintWhich::All)]
-    pub print_which: PrintWhich,
+    print_which: PrintWhich,
     #[clap(short='s', long)]
-    pub status: bool,
+    status: bool,
     #[clap(long)]
-    pub plain: bool,
+    plain: bool,
     #[clap(short, long)]
-    pub level: Option<usize>,
+    level: Option<usize>,
     #[clap(long="display-hidden")]
-    pub display_hidden: bool,
+    display_hidden: bool,
 }
 #[derive(Parser, Clone)]
-pub struct RemoveArgs {
+struct RemoveArgs {
     #[clap()]
-    pub item_location: Vec<usize>,
+    item_location: Vec<usize>,
 }
 #[derive(Parser, Clone)]
-pub struct UncheckArgs {
+struct UncheckArgs {
     #[clap()]
-    pub item_location: Vec<usize>,
+    item_location: Vec<usize>,
 }
 #[derive(Parser, Clone)]
-pub struct UnhideArgs {
+struct UnhideArgs {
     #[clap()]
-    pub item_location: Vec<usize>,
+    item_location: Vec<usize>,
 }
 #[derive(Subcommand, Clone)]
 #[clap(about, version, author)]
-pub enum Mode {
+enum Mode {
     /// Add a new list-item
     Add(AddArgs),
     /// Check-off an existing list-item
@@ -191,11 +163,10 @@ impl Mode {
         }
     }
 }
-pub struct Ctx {
-    pub args: Args,
-    pub buffer: String,
-    pub path: PathBuf,
-    pub term: Stdout,
+struct Ctx {
+    args: Args,
+    buffer: String,
+    path: PathBuf,
 }
 impl<'ctx> Ctx {
     fn construct_path(&mut self) {
@@ -211,16 +182,16 @@ impl<'ctx> Ctx {
             None => self.path.push(format!("{}.json", &self.args.list_path)),
         }
     }
-    pub fn init(out: Stdout) -> Result<Self, ExitCode> {
+    fn init() -> Result<Self, ExitCode> {
         let mut args = Args::parse();
         args.reverse_coordinates();
         let buffer = String::new();
         let path = PathBuf::new();
-        let mut ctx = Self { args, buffer, path, term: out };
+        let mut ctx = Self { args, buffer, path };
         ctx.construct_path();
         Ok(ctx)
     }
-    pub fn check_path(&mut self, condition: PathExitCondition) -> Result<(), ExitCode> {
+    fn check_path(&mut self, condition: PathExitCondition) -> Result<(), ExitCode> {
         match condition {
             PathExitCondition::Exists => {
                 if self.path.exists() {
@@ -239,18 +210,7 @@ impl<'ctx> Ctx {
             PathExitCondition::Ignore => return Ok(()),
         };
     }
-    pub fn print(&mut self, msg: impl AsRef<str>) {
-        if !self.buffer.is_empty() {
-            self.buffer.push_str("\n");
-        }
-        self.buffer.push_str(&format!("{}", msg.as_ref()));
-    }
-    pub fn q_print(&mut self, msg: impl AsRef<str>) {
-        if !self.args.quiet {
-            self.print(msg);
-        }
-    }
-    pub fn flush(&mut self, code: &ExitCode) {
+    fn flush(&mut self, code: &ExitCode) {
         if !self.buffer.is_empty() {
             println!("Exited with code: {}", code);
             println!("{}", self.buffer);
@@ -263,15 +223,6 @@ impl GetPath for Ctx {
     }
     fn get_path_mut(&mut self) -> &mut PathBuf {
         return &mut self.path;
-    }
-}
-impl Terminal for Ctx {
-    fn queue_cmd(&mut self, cmd: impl Command) -> Result<(), IOError> {
-        self.term.queue(cmd)?;
-        Ok(())
-    }
-    fn write_str(&mut self, msg: impl AsRef<str>) -> Result<(), IOError> {
-        self.term.write_all(msg.as_ref().as_bytes())
     }
 }
 fn safe_get_list(arg: &str) -> Result<String, String> {
@@ -287,26 +238,19 @@ fn safe_get_list(arg: &str) -> Result<String, String> {
 /// A todo list manager
 #[derive(Parser, Clone)]
 #[clap(about, version, author)]
-pub struct Args {
+struct Args {
     // Options
     // Make the list_path arg require either a string passed or the TODO_LIST env var
     /// The relative or absolute path to the list (w/o file extension)
     #[clap(short='l', long="list-path", default_value_t = String::new(), parse(try_from_str = safe_get_list))]
-    pub list_path: String,
-    // Flags
-    /// Silences all messages (overrides verbose flag)
-    #[clap(short='q', long)]
-    pub quiet: bool,
-    /// Prints verbose messages during output
-    #[clap(short='v', long)]
-    pub verbose: bool,
+    list_path: String,
     // Modes
     /// The program action to take
     #[clap(subcommand)]
-    pub mode: Mode,
+    mode: Mode,
 }
 impl Args {
-    pub fn reverse_coordinates(&mut self) {
+    fn reverse_coordinates(&mut self) {
         self.mode.reverse_coordinates();
     }
 }
@@ -322,8 +266,8 @@ fn sleep_til(start: Instant) {
     }
 }
 fn main() -> Result<(), IOError> {
-    let out = stdout();
-    let mut ctx = Ctx::init(out).unwrap_or_else(|e| {
+    let mut out = stdout();
+    let mut ctx = Ctx::init().unwrap_or_else(|e| {
         println!("{}", e);
         std::process::exit(e.into());
     });
@@ -332,7 +276,6 @@ fn main() -> Result<(), IOError> {
         Mode::Monitor => {
             ctx.check_path(PathExitCondition::NotExists)
                 .unwrap_or_else(|e| safe_exit(&mut ctx, e));
-            ctx.queue_cmd(cursor::SavePosition)?;
             let mut hash = String::new();
             loop {
                 let start = Instant::now();
@@ -361,12 +304,14 @@ fn main() -> Result<(), IOError> {
                         sleep_til(start);
                         continue;
                     }
-                    ctx.queue_cmd(cursor::RestorePosition)?;
-                    ctx.queue_cmd(Clear(ClearType::FromCursorDown))?;
+                    out.queue(Clear(ClearType::All))?;
+                    let mut output = String::new();
                     container.print(
-                        &mut ctx, &PrintWhich::All, false, None, false
+                        &mut output, &PrintWhich::All, false, None, false
                     )?;
-                    ctx.write_str("\n")?;
+                    output.push_str("\r\n");
+                    let stylized_out = output.attribute(Attribute::Framed);
+                    println!("{}", stylized_out);
                 }
                 // clear
                 sleep_til(start);
@@ -488,20 +433,14 @@ fn main() -> Result<(), IOError> {
                 .unwrap_or_else(|e| safe_exit(&mut ctx, e));
             let mut container = Container::load(&mut ctx)
                 .unwrap_or_else(|e| safe_exit(&mut ctx, e));
+            let mut output = String::new();
             container.print(
-                &mut ctx, &print_which, args.plain, args.level,
+                &mut output, &print_which, args.plain, args.level,
                 args.display_hidden,
             )?;
-            ctx.write_str("\n")?;
-            //if args.status {
-            //    ctx.check_path(PathExitCondition::NotExists)
-            //        .unwrap_or_else(|e| safe_exit(&mut ctx, e));
-            //    let mut content = String::new();
-            //    let mut container = Container::load(&mut ctx)
-            //        .unwrap_or_else(|e| safe_exit(&mut ctx, e));
-            //    container.status(&mut content, &print_which);
-            //    ctx.print(content);
-            //}
+            output.push_str("\r\n");
+            let stylized_out = output.attribute(Attribute::Framed);
+            println!("{}", stylized_out);
         },
     }
     safe_exit(&mut ctx, ExitCode::Success);
