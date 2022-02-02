@@ -1,14 +1,12 @@
 use {
     clap::{ Parser, Subcommand, },
     crossterm::{
-        QueueableCommand,
-        terminal::{ Clear, ClearType, },
-        style::{ Stylize, Attribute, },
+        execute, terminal::{ Clear, ClearType, },
     },
     std::{
         fmt::{ Display, Formatter, Error as FormatError, },
         fs::File,
-        io::{ Error as IOError, Read, stdout },
+        io::{ Error as IOError, Read, stdout, },
         path::PathBuf,
         thread::sleep as thread_sleep,
         time::{ Duration, Instant, },
@@ -266,7 +264,6 @@ fn sleep_til(start: Instant) {
     }
 }
 fn main() -> Result<(), IOError> {
-    let mut out = stdout();
     let mut ctx = Ctx::init().unwrap_or_else(|e| {
         println!("{}", e);
         std::process::exit(e.into());
@@ -304,14 +301,13 @@ fn main() -> Result<(), IOError> {
                         sleep_til(start);
                         continue;
                     }
-                    out.queue(Clear(ClearType::All))?;
+                    execute!(stdout(), Clear(ClearType::All))?;
                     let mut output = String::new();
                     container.print(
                         &mut output, &PrintWhich::All, false, None, false
                     )?;
                     output.push_str("\r\n");
-                    let stylized_out = output.attribute(Attribute::Framed);
-                    println!("{}", stylized_out);
+                    println!("{}", output);
                 }
                 // clear
                 sleep_til(start);
@@ -439,8 +435,7 @@ fn main() -> Result<(), IOError> {
                 args.display_hidden,
             )?;
             output.push_str("\r\n");
-            let stylized_out = output.attribute(Attribute::Framed);
-            println!("{}", stylized_out);
+            println!("{}", output);
         },
     }
     safe_exit(&mut ctx, ExitCode::Success);
